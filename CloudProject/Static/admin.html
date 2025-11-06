@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard — Secure Access</title>
+  <style>
+    :root{
+      --bg:#0d1117;
+      --panel:#0f1722;
+      --muted:#8b949e;
+      --text:#e6edf3;
+      --brand:#58a6ff;
+      --ok:#2ea043;
+      --warn:#f2cc60;
+      --bad:#ff6961;
+      --stroke:#30363d;
+      --card-glow: 0 10px 35px rgba(88,166,255,.15);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; padding:24px;
+      font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text); background: var(--bg);
+      background-image:
+        radial-gradient(1200px 600px at 10% -10%, rgba(88,166,255,.15), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(46,160,67,.12), transparent 60%),
+        radial-gradient(700px 400px at -10% 100%, rgba(242,204,96,.10), transparent 60%);
+      min-width:320px;
+    }
+    .max{max-width:1000px; margin:0 auto}
+    header{display:flex; align-items:center; gap:16px; justify-content:space-between; margin-bottom:18px}
+    h1{margin:0; font-size: clamp(20px, 3vw, 28px); letter-spacing:.3px; color:var(--brand); display:flex; align-items:center; gap:10px}
+    .sub{color:var(--muted); font-size:14px}
+
+    /* Timer chip with circular progress */
+    
+    .ring{width:28px; height:28px; position:relative}
+    .ring svg{transform: rotate(-90deg)}
+    .ring circle{fill:none; stroke-width:6; stroke-linecap:round}
+    .ring .track{stroke:#1f2630}
+    .ring .prog{stroke:var(--brand); transition: stroke-dashoffset .4s linear}
+    .chip-text{font-variant-numeric: tabular-nums}
+
+    /* Card */
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00));
+      border:1px solid var(--stroke); border-radius: var(--radius);
+      box-shadow: var(--card-glow); padding:18px;
+    }
+
+    /* Token section */
+    #token-section{ display:grid; gap:14px; grid-template-columns: 1fr auto; align-items:center }
+    .input{position:relative}
+    input[type="text"]{
+      width:100%; padding:12px 44px 12px 12px; border-radius:10px;
+      border:1px solid var(--stroke); background:#0b1220; color:var(--text);
+      outline:none; transition: border-color .2s, box-shadow .2s;
+      font-variant-numeric: tabular-nums;
+    }
+    input[type="text"]:focus{ border-color: var(--brand); box-shadow: 0 0 0 4px rgba(88,166,255,.15) }
+    .hint{font-size:12px; color:var(--muted); margin-top:-6px; grid-column:1 / -1}
+
+    .btn{
+      appearance:none; border:none; cursor:pointer;
+      padding:12px 16px; border-radius:10px; font-weight:700;
+      background: linear-gradient(180deg, #238636, #1e7a31); color:white;
+      transition: transform .06s ease, filter .2s ease, opacity .2s ease;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn:hover{ filter: brightness(1.05) }
+    .btn:active{ transform: translateY(1px) }
+    .btn[disabled]{ opacity:.6; cursor:not-allowed }
+    .btn.secondary{ background: linear-gradient(180deg, #30363d, #22272e) }
+
+    /* Dashboard */
+    #admin-content{ display:none; margin-top:20px; }
+    .toolbar{ display:flex; align-items:center; gap:10px; justify-content:space-between; margin: 6px 0 8px }
+
+    table{ width:100%; border-collapse: collapse; border:1px solid var(--stroke); overflow:hidden; border-radius:12px }
+    thead th{ background:#111826; position:sticky; top:0; z-index:1 }
+    th, td{ padding:12px 10px; border-bottom:1px solid #1e2630; text-align:left }
+    tbody tr{ transition: background .15s }
+    tbody tr:hover{ background: rgba(88,166,255,.06) }
+    tbody tr:nth-child(2n){ background: rgba(255,255,255,.01) }
+
+    .empty{
+      text-align:center; color:var(--muted); padding:36px 16px; border:1px dashed #2a3240; border-radius:12px; margin-top:12px
+    }
+
+    /* Toasts */
+    .toasts{ position: fixed; right:16px; top:16px; display:grid; gap:10px; z-index:9999 }
+    .toast{ background:#0b1220; border:1px solid var(--stroke); padding:12px 14px; border-radius:10px; box-shadow: var(--card-glow); display:flex; gap:10px; align-items:flex-start; min-width:240px }
+    .toast.ok{ border-color: rgba(46,160,67,.6) }
+    .toast.bad{ border-color: rgba(255,105,97,.6) }
+    .toast .t-title{ font-weight:700 }
+    .toast .t-msg{ color:var(--muted); font-size:13px }
+
+    @media (max-width: 640px){
+      header{flex-direction:column; align-items:flex-start; gap:8px}
+      #token-section{ grid-template-columns: 1fr; }
+      .btn{ width:100% }
+    }
+  </style>
+</head>
+<body>
+  <div class="max">
+    <header>
+      <div>
+        <h1>🛡 Admin Dashboard</h1>
+        <div class="sub">Secure, time-bound access with live session monitoring</div>
+      </div>
+      
+        <span class="chip-text" id="countdown">--:--</span>
+      </div>
+    </header>
+
+    <section class="card" id="token-card">
+      <div id="token-section">
+        <div class="input">
+          <input id="tokenInput" type="text" inputmode="numeric" autocomplete="off"
+                 placeholder="Enter your binary access token (e.g. 101001)"
+                 pattern="^[01]+$" title="Token must be binary: only 0 and 1" />
+        </div>
+        <button id="verifyBtn" class="btn">
+          <span class="btn-icon" aria-hidden="true">🔐</span>
+          <span>Verify Access</span>
+        </button>
+        <div class="hint">Tip: your token contains <strong>only 0 and 1</strong>. We'll keep it in this tab only.</div>
+      </div>
+    </section>
+
+    <section id="admin-content" class="card" aria-live="polite">
+      <div class="toolbar">
+        <div style="display:flex; align-items:center; gap:8px">
+          <strong>Active Sessions</strong>
+          <span id="refreshHint" class="sub">(auto-refreshes)</span>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button id="refreshBtn" class="btn secondary" title="Refresh now">⟳ Refresh</button>
+          <button id="logoutBtn" class="btn" title="End access">⏏ Logout</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="sessionTable" role="table" aria-label="Active sessions table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Resource</th>
+              <th>Bits</th>
+              <th>Expires At</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="emptyState" class="empty" style="display:none">No active sessions yet. 👀</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toasts" aria-live="assertive" aria-atomic="true"></div>
+
+  <script>
+    let expiryTime = null;
+    let timerInterval = null;
+    let refreshInterval = null;
+    let userToken = null;
+
+    const els = {
+      verifyBtn: document.getElementById('verifyBtn'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      logoutBtn: document.getElementById('logoutBtn'),
+      tokenInput: document.getElementById('tokenInput'),
+      admin: document.getElementById('admin-content'),
+      tbody: document.querySelector('#sessionTable tbody'),
+      empty: document.getElementById('emptyState'),
+      countdown: document.getElementById('countdown'),
+      ringProg: document.querySelector('.ring .prog'),
+      tokenCard: document.getElementById('token-card'),
+      toasts: document.querySelector('.toasts'),
+    };
+
+    // Helper: zero-pad and format time safely
+    const pad = n => String(Math.max(0, n|0)).padStart(2,'0');
+    function fmt(ms){
+      if(!isFinite(ms) || ms <= 0) return '00:00';
+      const mins = Math.floor(ms/60000);
+      const secs = Math.floor((ms%60000)/1000);
+      return `${pad(mins)}:${pad(secs)}`;
+    }
+
+    // Parse various expiry formats robustly
+    function parseExpiry(exp){
+      if(exp instanceof Date && isFinite(exp)) return exp;
+      if(typeof exp === 'number' && isFinite(exp)){
+        // treat as unix epoch ms if big, else seconds-from-now
+        return exp > 10_000 ? new Date(exp) : new Date(Date.now() + exp*1000);
+      }
+      if(typeof exp === 'string'){
+        const d = new Date(exp);
+        if(isFinite(d)) return d;
+      }
+      // Fallback: 5 minutes from now so timer never NaNs
+      return new Date(Date.now()+5*60*1000);
+    }
+
+    // Restore token from sessionStorage (tab scope) if present
+    (function init(){
+      const saved = sessionStorage.getItem('admin_token');
+      if(saved){
+        userToken = saved;
+        verifyWithExistingToken();
+      } else {
+        els.countdown.textContent = '00:00';
+      }
+    })();
+
+    els.verifyBtn.addEventListener('click', onVerify);
+    els.refreshBtn.addEventListener('click', loadSessions);
+    els.logoutBtn.addEventListener('click', () => clearAccess('Logged out.'));
+
+    async function onVerify(){
+      const token = els.tokenInput.value.trim();
+      if(!token){ return toast('Enter your token to continue','Heads up'); }
+      if(!/^([01])+$/g.test(token)){
+        els.tokenInput.focus();
+        return toast('Token must contain only 0 and 1.','Invalid token', 'bad');
+      }
+
+      toggleVerifyLoading(true);
+      try{
+        const res = await fetch(`/access/${token}`);
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){ throw new Error(data?.detail || 'Invalid token'); }
+
+        if(data.status === 'ACCESS GRANTED'){
+          userToken = token;
+          sessionStorage.setItem('admin_token', token);
+
+          const exp = data.expires_at ?? data.expiresAt ?? data.expiry ?? data.ttlSeconds ?? null;
+          startTimer(exp);
+
+          els.admin.style.display = 'block';
+          toast(`Welcome, ${data.username}. Access granted for a limited time.`, 'Access granted', 'ok');
+          loadSessions();
+          beginAutoRefresh();
+          els.tokenCard.style.display = 'none';
+        } else {
+          throw new Error(data.message || 'Access denied');
+        }
+      }catch(err){
+        toast(err.message || 'Access denied','Access denied','bad');
+      }finally{
+        toggleVerifyLoading(false);
+      }
+    }
+
+    async function verifyWithExistingToken(){
+      try{
+        const res = await fetch(`/admin/sessions`, { headers: { Authorization: userToken }});
+        if(res.ok){
+          // Unknown exact expiry; use a safe placeholder
+          startTimer(Date.now() + 5*60*1000);
+          els.admin.style.display = 'block';
+          loadSessions();
+          beginAutoRefresh();
+          els.tokenCard.style.display = 'none';
+          toast('Restored your session in this tab.','Welcome back','ok');
+        } else {
+          clearAccess();
+        }
+      }catch{ clearAccess(); }
+    }
+
+    function toggleVerifyLoading(isLoading){
+      els.verifyBtn.disabled = isLoading;
+      els.verifyBtn.innerHTML = isLoading ?
+        '<span aria-hidden="true">⏳</span><span>Verifying…</span>' :
+        '<span aria-hidden="true">🔐</span><span>Verify Access</span>';
+    }
+
+    function startTimer(expiry){
+      const expiryDate = parseExpiry(expiry);
+      const startMs = Math.max(0, expiryDate.getTime() - Date.now());
+      expiryTime = expiryDate.getTime();
+
+      clearInterval(timerInterval);
+      updateRing(1, 88);
+      els.countdown.textContent = fmt(startMs);
+
+      const totalMs = startMs;
+      timerInterval = setInterval(() => {
+        const remaining = Math.max(0, expiryTime - Date.now());
+        els.countdown.textContent = fmt(remaining);
+
+        if(totalMs > 0){
+          const pct = remaining / totalMs;
+          updateRing(pct, 88);
+        }
+
+        if(remaining <= 0){
+          clearInterval(timerInterval);
+          toast('Your access window has expired.','Session ended','bad');
+          clearAccess();
+        }
+      }, 1000);
+    }
+
+    function updateRing(pct, circ){
+      if(!els.ringProg) return;
+      const off = Math.max(0, circ - circ * Math.max(0, Math.min(1, pct)));
+      els.ringProg.setAttribute('stroke-dashoffset', String(off));
+    }
+
+    function beginAutoRefresh(){
+      clearInterval(refreshInterval);
+      refreshInterval = setInterval(loadSessions, 10_000);
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible'){ loadSessions(); }
+      });
+    }
+
+    async function loadSessions(){
+      if(!userToken){ return; }
+      try{
+        const res = await fetch('/admin/sessions', { headers: { Authorization: userToken } });
+        if(!res.ok){ throw new Error('Token expired or invalid.'); }
+        const sessions = await res.json();
+        renderRows(sessions);
+      }catch(err){
+        toast(err.message || 'Failed to load sessions','Error','bad');
+        clearAccess();
+      }
+    }
+
+    function renderRows(rows){
+      els.tbody.innerHTML = '';
+      if(!rows || !rows.length){
+        els.empty.style.display = 'block';
+        return;
+      }
+      els.empty.style.display = 'none';
+      rows.sort((a,b)=> new Date(a.expires_at) - new Date(b.expires_at));
+      for(const s of rows){
+        const tr = document.createElement('tr');
+        const exp = new Date(s.expires_at);
+        tr.innerHTML = `
+          <td>${escapeHtml(s.username)}</td>
+          <td>${escapeHtml(s.resource)}</td>
+          <td>${Number(s.bits) || 0}</td>
+          <td title="${isFinite(exp)?exp.toISOString():''}">${isFinite(exp)?exp.toLocaleString():'—'}</td>
+        `;
+        els.tbody.appendChild(tr);
+      }
+    }
+
+    function clearAccess(msg){
+      userToken = null;
+      sessionStorage.removeItem('admin_token');
+      clearInterval(refreshInterval);
+      els.admin.style.display = 'none';
+      els.tokenCard.style.display = 'block';
+      els.countdown.textContent = '00:00';
+      updateRing(0, 88);
+      if(msg){ toast(msg, 'Notice'); }
+    }
+
+    function toast(message, title='Notice', type=''){
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.innerHTML = `
+        <div class="t-body">
+          <div class="t-title">${escapeHtml(title)}</div>
+          <div class="t-msg">${escapeHtml(message)}</div>
+        </div>
+      `;
+      els.toasts.appendChild(el);
+      setTimeout(()=> el.remove(), 3500);
+    }
+
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+    }
+  </script>
+</body>
+</html>
